@@ -1,5 +1,6 @@
 # Recordings and derived data — not tracked in git
-output/
+videos/
+outputs/
 *.vrs
 
 # Python

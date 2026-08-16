@@ -2,7 +2,7 @@
 transcription plus sampled RGB frames for object detection.
 
 Usage:
-    python scripts/ingest_vrs.py output/<session_id>
+    python scripts/ingest_vrs.py <session_id>
 """
 
 from __future__ import annotations
@@ -53,9 +53,17 @@ def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> N
     # samples are (frame, channel). Downmix to mono for transcription.
     interleaved = interleaved[: len(interleaved) - (len(interleaved) % num_channels)]
     mono32 = interleaved.reshape(-1, num_channels).mean(axis=1) if num_channels > 1 else interleaved.astype(np.float64)
-    # Downscale from the ~24-bit range actually used down to int16 for a
-    # standard PCM16 wav (what faster-whisper/ffmpeg expect by default).
-    pcm = np.clip(mono32 / 256.0, -32768, 32767).astype(np.int16)
+    # Scale to int16 range based on the actual observed peak rather than
+    # assuming a fixed bit depth — different Aria units/firmware have been
+    # observed reporting mic samples at different effective bit depths, and
+    # blindly right-shifting (e.g. dividing by 256 assuming 24-bit-in-32-bit)
+    # can crush a recording that's already within int16 range down to
+    # near-silence, which then makes downstream VAD-based transcription
+    # detect no speech at all.
+    peak = np.abs(mono32).max()
+    if peak > 32767:
+        mono32 = mono32 * (32767.0 / peak)
+    pcm = np.clip(mono32, -32768, 32767).astype(np.int16)
 
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out_wav), "wb") as wf:
@@ -91,10 +99,10 @@ def extract_frames(provider: "data_provider.VrsDataProvider", frames_dir: Path) 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
     paths.ensure_dirs()
 
     vrs_path = paths.vrs_file()

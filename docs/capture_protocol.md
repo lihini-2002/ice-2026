@@ -20,8 +20,8 @@ This narration cue is intentional: it gives the pipeline a free, reliable step-b
 
 ## After the session
 1. Export the `.vrs` file from the glasses via Aria Studio (or USB transfer) to a local machine.
-2. Name it `<craft>_<artisan_id>_<yyyymmdd>.vrs` and place it in `output/<session_id>/raw/`.
-3. Record session metadata (artisan name/id, craft, date, task description) in `output/<session_id>/meta.json` — `run_pipeline.py` will read this.
+2. Name it `<craft>_<artisan_id>_<yyyymmdd>.vrs` and place it in `videos/<session_id>/raw/`.
+3. Record session metadata (artisan name/id, craft, date, task description) in `videos/<session_id>/meta.json` — `run_pipeline.py` will read this.
 4. **Before submitting to MPS** (Meta's cloud service for eye gaze / hand tracking): confirm with the artisan/organization that uploading this footage to Meta's servers for processing is acceptable. This is a real data-handling decision for proprietary craft technique — do not treat it as a formality.
 
 ## Known limits of this pilot protocol

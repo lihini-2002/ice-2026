@@ -45,10 +45,10 @@ default but will use CUDA if available.
 ## Running a session
 
 1. Follow [docs/capture_protocol.md](docs/capture_protocol.md) to record and export a session.
-2. Lay out the session directory:
+2. Lay out the input session directory:
 
    ```
-   output/<session_id>/
+   videos/<session_id>/
        meta.json          # see meta.example.json
        raw/<name>.vrs      # exported Aria recording
        mps/                # optional — MPS eye-gaze/hand-tracking results
@@ -57,20 +57,20 @@ default but will use CUDA if available.
 3. Run the pipeline:
 
    ```bash
-   python scripts/run_pipeline.py output/<session_id>
+   python scripts/run_pipeline.py <session_id>
    ```
 
    Individual stages can be skipped (e.g. to re-run only the fusion step after tweaking data):
 
    ```bash
-   python scripts/run_pipeline.py output/<session_id> --skip ingest_vrs.py transcribe.py extract_scene_objects.py
+   python scripts/run_pipeline.py <session_id> --skip ingest_vrs.py transcribe.py extract_scene_objects.py
    ```
 
-4. Read the result at `output/<session_id>/session.md` (or `session.json` for the structured
+4. Read the result at `outputs/<session_id>/session.md` (or `session.json` for the structured
    version).
 
-`output/` is git-ignored — recordings and derived data (including proprietary craft technique)
-are never committed. See the data-handling note in
+`videos/` and `outputs/` are git-ignored — recordings and derived data (including proprietary
+craft technique) are never committed. See the data-handling note in
 [docs/capture_protocol.md](docs/capture_protocol.md) before submitting a recording to Meta's MPS
 cloud service.
 
@@ -78,8 +78,9 @@ cloud service.
 
 ```
 docs/capture_protocol.md   # how to record a session
-meta.example.json          # template for output/<session_id>/meta.json
+meta.example.json          # template for videos/<session_id>/meta.json
 requirements.txt           # Python dependencies
 scripts/                   # pipeline stages (see "How it works" above)
-output/                    # git-ignored — session recordings and derived data live here
+videos/                    # git-ignored — input: raw .vrs recordings, meta.json, MPS results
+outputs/                   # git-ignored — output: per-session pipeline results live here
 ```

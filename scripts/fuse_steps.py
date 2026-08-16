@@ -12,7 +12,7 @@ just aggregates those samples per step into a ranked, human-readable
 summary.
 
 Usage:
-    python scripts/fuse_steps.py output/<session_id>
+    python scripts/fuse_steps.py <session_id>
 """
 
 from __future__ import annotations
@@ -125,10 +125,10 @@ def render_markdown(session: Session) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
     meta = load_json(paths.meta)
     transcript = load_json(paths.transcript_json)
     objects = load_json(paths.objects_json) if paths.objects_json.exists() else []
@@ -139,7 +139,7 @@ def main() -> None:
     attach_gaze_and_hand_targets(steps, gaze_hand_samples)
 
     session = Session(
-        session_id=paths.root.name,
+        session_id=args.session_id,
         craft=meta["craft"],
         artisan_id=meta["artisan_id"],
         date=meta["date"],
