@@ -1,0 +1,7 @@
+# Recordings and derived data — not tracked in git
+output/
+*.vrs
+__pycache__/
+*.pyc
+.venv/
+venv/

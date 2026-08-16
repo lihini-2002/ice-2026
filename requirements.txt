@@ -1,0 +1,12 @@
+# Core Aria data reading (VRS + MPS eye gaze / hand tracking parsing)
+projectaria-tools>=2.2.0
+
+# Narration transcription (local, no audio leaves the machine)
+faster-whisper>=1.0.0
+
+# Scene/object detection on sampled RGB frames — open-vocabulary detector
+# so we're not limited to a fixed COCO label set for craft tools/materials.
+# Swap for a local VLM later if better tool/material recognition is needed.
+transformers>=4.40.0
+torch>=2.2.0
+pillow>=10.0.0
