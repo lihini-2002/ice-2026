@@ -17,7 +17,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-STAGES = ["ingest_vrs.py", "transcribe.py", "extract_scene_objects.py", "fuse_steps.py"]
+STAGES = [
+    "ingest_vrs.py",
+    "transcribe.py",
+    "extract_scene_objects.py",
+    "extract_gaze_hand_targets.py",
+    "fuse_steps.py",
+]
 
 
 def main() -> None:

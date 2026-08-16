@@ -9,6 +9,7 @@ The pipeline works entirely off a session directory laid out as:
         derived/
             transcript.json        # written by transcribe.py
             objects.json           # written by extract_scene_objects.py
+            gaze_hand_targets.json # written by extract_gaze_hand_targets.py
             frames/                # sampled RGB frames referenced by objects.json / session.json
         session.json                # written by fuse_steps.py — the knowledge-base unit
         session.md                  # human-readable rendering of session.json
@@ -54,6 +55,10 @@ class SessionPaths:
         return self.derived_dir / "objects.json"
 
     @property
+    def gaze_hand_json(self) -> Path:
+        return self.derived_dir / "gaze_hand_targets.json"
+
+    @property
     def session_json(self) -> Path:
         return self.root / "session.json"
 
@@ -88,6 +93,7 @@ class Step:
     narration: str
     tools_used: list[str] = field(default_factory=list)
     hand_actions: list[str] = field(default_factory=list)
+    gaze_targets: list[str] = field(default_factory=list)
     frame_refs: list[str] = field(default_factory=list)
 
 

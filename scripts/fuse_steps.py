@@ -1,15 +1,15 @@
-"""Stage 4: fuse transcript + detected objects + hand-tracking into the
+"""Stage 5: fuse transcript + detected objects + gaze/hand targets into the
 per-step knowledge-base entries, and write session.json / session.md.
 
 Step boundaries come from the narration cue phrases artisans are asked to
 use (see docs/capture_protocol.md): a transcript segment starting with
 "next, i" / "now i'm going to" (etc.) starts a new step.
 
-Hand-object association (e.g. "gripping the chisel") needs projecting 3D
-hand landmarks into the RGB camera frame via device calibration, which is
-out of scope for this pilot — instead we report per-step hand-tracking
-coverage (which hand(s) were tracked, how continuously) as a starting
-signal, and leave precise hand↔tool linking as future work.
+Hand-object and gaze-object association ("gripping the rib tool", "looking
+at the clay") comes from extract_gaze_hand_targets.py's per-sample
+projection of MPS gaze/hand data onto the detected-object boxes; this stage
+just aggregates those samples per step into a ranked, human-readable
+summary.
 
 Usage:
     python scripts/fuse_steps.py output/<session_id>
@@ -19,8 +19,7 @@ from __future__ import annotations
 
 import argparse
 import re
-from collections import Counter, defaultdict
-from pathlib import Path
+from collections import Counter
 
 from common import SessionPaths, Session, Step, load_json, write_json
 
@@ -65,35 +64,40 @@ def attach_objects(steps: list[Step], objects: list[dict]) -> None:
         step.frame_refs = frames_in_step[:2]  # a couple of representative frames
 
 
-def attach_hand_tracking(steps: list[Step], mps_dir: Path) -> None:
-    hand_files = list(mps_dir.glob("**/hand_tracking_results.csv"))
-    if not hand_files:
+def _ranked_targets(counts: Counter[str], total: int, top_n: int = 2) -> list[str]:
+    if total == 0:
+        return []
+    return [f"{label} ({100 * n // total}%)" for label, n in counts.most_common(top_n)]
+
+
+def attach_gaze_and_hand_targets(steps: list[Step], samples: list[dict]) -> None:
+    if not samples:
         for step in steps:
+            step.gaze_targets = ["no eye-gaze data available"]
             step.hand_actions = ["no hand-tracking data available"]
         return
 
-    from projectaria_tools.core.mps.hand_tracking import read_hand_tracking_results
+    for step in steps:
+        in_step = [s for s in samples if step.start_s <= s["timestamp_s"] <= step.end_s]
 
-    results = read_hand_tracking_results(str(hand_files[0]))
-    by_step: dict[int, dict[str, int]] = defaultdict(lambda: {"left": 0, "right": 0})
+        gaze_counts: Counter[str] = Counter(s["gaze_target"] for s in in_step if s.get("gaze_target"))
+        gaze_total = sum(1 for s in in_step if "gaze_target" in s)
+        step.gaze_targets = _ranked_targets(gaze_counts, gaze_total) or (
+            ["no eye-gaze data in this step"] if gaze_total == 0 else ["gaze not on a detected object"]
+        )
 
-    for r in results:
-        t_s = r.tracking_timestamp.total_seconds()
-        for i, step in enumerate(steps):
-            if step.start_s <= t_s <= step.end_s:
-                if r.left_hand is not None:
-                    by_step[i]["left"] += 1
-                if r.right_hand is not None:
-                    by_step[i]["right"] += 1
-                break
-
-    for i, step in enumerate(steps):
-        counts = by_step.get(i, {"left": 0, "right": 0})
         actions = []
-        if counts["left"]:
-            actions.append(f"left hand tracked ({counts['left']} samples)")
-        if counts["right"]:
-            actions.append(f"right hand tracked ({counts['right']} samples)")
+        for side in ("left", "right"):
+            key = f"{side}_hand_target"
+            side_counts: Counter[str] = Counter(s[key] for s in in_step if s.get(key))
+            side_total = sum(1 for s in in_step if key in s)
+            if side_total == 0:
+                continue
+            ranked = _ranked_targets(side_counts, side_total)
+            if ranked:
+                actions.append(f"{side} hand on {ranked[0]}")
+            else:
+                actions.append(f"{side} hand tracked, not on a detected object ({side_total} samples)")
         step.hand_actions = actions or ["no hand-tracking data in this step"]
 
 
@@ -110,6 +114,8 @@ def render_markdown(session: Session) -> str:
             lines.append(f"- **Tools/materials seen:** {', '.join(step.tools_used)}")
         if step.hand_actions:
             lines.append(f"- **Hands:** {', '.join(step.hand_actions)}")
+        if step.gaze_targets:
+            lines.append(f"- **Looking at:** {', '.join(step.gaze_targets)}")
         if step.frame_refs:
             lines.append(f"- **Frames:** {', '.join(step.frame_refs)}")
         lines.append("")
@@ -125,10 +131,11 @@ def main() -> None:
     meta = load_json(paths.meta)
     transcript = load_json(paths.transcript_json)
     objects = load_json(paths.objects_json) if paths.objects_json.exists() else []
+    gaze_hand_samples = load_json(paths.gaze_hand_json) if paths.gaze_hand_json.exists() else []
 
     steps = segment_into_steps(transcript)
     attach_objects(steps, objects)
-    attach_hand_tracking(steps, paths.mps_dir)
+    attach_gaze_and_hand_targets(steps, gaze_hand_samples)
 
     session = Session(
         session_id=paths.root.name,
