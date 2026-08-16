@@ -1,7 +1,26 @@
 # Recordings and derived data — not tracked in git
 output/
 *.vrs
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model/download caches
+.cache/
+
+# Editor/OS cruft
+.DS_Store
+.vscode/
+.idea/
+
+# Local env overrides
+.env
+.env.*

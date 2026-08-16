@@ -30,26 +30,40 @@ def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> N
     if stream_id is None:
         raise RuntimeError("No audio stream found in this VRS — narration transcription needs the mic stream.")
 
+    # Sample rate and channel count live on the stream's audio configuration,
+    # not on each per-record AudioData (which only exposes `data`/`max_amplitude`).
+    config = provider.get_audio_configuration(stream_id)
+    sample_rate = config.sample_rate
+    num_channels = config.num_channels
+
     num_data = provider.get_num_data(stream_id)
     frames = []
-    sample_rate = None
     for i in range(num_data):
         audio_data, _record = provider.get_audio_data_by_index(stream_id, i)
-        if sample_rate is None:
-            sample_rate = audio_data.sample_rate
-        frames.append(np.array(audio_data.data, dtype=np.int16))
+        # Aria mic samples come back as plain Python ints wider than 16 bits
+        # (observed as 24-bit audio left-shifted into a 32-bit word) — int32
+        # is the safe container; forcing int16 here overflows.
+        frames.append(np.array(audio_data.data, dtype=np.int32))
 
     if not frames:
         raise RuntimeError("Audio stream was present but contained no samples.")
 
-    pcm = np.concatenate(frames)
+    interleaved = np.concatenate(frames)
+    # Aria's mic array has multiple channels (e.g. 7-mic array); interleaved
+    # samples are (frame, channel). Downmix to mono for transcription.
+    interleaved = interleaved[: len(interleaved) - (len(interleaved) % num_channels)]
+    mono32 = interleaved.reshape(-1, num_channels).mean(axis=1) if num_channels > 1 else interleaved.astype(np.float64)
+    # Downscale from the ~24-bit range actually used down to int16 for a
+    # standard PCM16 wav (what faster-whisper/ffmpeg expect by default).
+    pcm = np.clip(mono32 / 256.0, -32768, 32767).astype(np.int16)
+
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out_wav), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)  # int16
         wf.setframerate(sample_rate)
         wf.writeframes(pcm.tobytes())
-    print(f"Wrote audio: {out_wav} ({len(pcm) / sample_rate:.1f}s @ {sample_rate}Hz)")
+    print(f"Wrote audio: {out_wav} ({len(pcm) / sample_rate:.1f}s @ {sample_rate}Hz, downmixed from {num_channels}ch)")
 
 
 def extract_frames(provider: "data_provider.VrsDataProvider", frames_dir: Path) -> None:

@@ -109,7 +109,8 @@ def main() -> None:
         pixel = rgb_calib.project(point_camera)
         if pixel is None:
             return None
-        return float(pixel[0, 0]), float(pixel[1, 0])
+        # project() returns a flat [x, y] array, not a (2,1) column.
+        return float(pixel[0]), float(pixel[1])
 
     samples: dict[float, dict] = {}
 

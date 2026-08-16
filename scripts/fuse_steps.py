@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import re
 from collections import Counter
+from pathlib import Path
 
 from common import SessionPaths, Session, Step, load_json, write_json
 
