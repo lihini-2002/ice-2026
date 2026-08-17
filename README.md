@@ -31,6 +31,24 @@ known limitations.
 [scripts/run_pipeline.py](scripts/run_pipeline.py) chains all five stages.
 [scripts/common.py](scripts/common.py) holds the shared session layout and dataclasses.
 
+## Downstream: teaching a novice from a captured session
+
+Two additions build a learning experience on top of a session's `session.json`:
+
+7. **Generate step templates** ([scripts/generate_step_templates.py](scripts/generate_step_templates.py))
+   — thresholds each step's frequency-ranked tools/hand targets into `required_tools`/`hand_state`,
+   and writes `step_templates.json`. Fields that need human/artisan judgment (`rationale`,
+   `success_criteria`, `common_mistakes`, `command_templates`) are left `null`/empty and marked
+   `needs_human_review` rather than invented — see
+   [learning_runtime/README.md](learning_runtime/README.md) for why, and
+   [docs/mistake_elicitation_protocol.md](docs/mistake_elicitation_protocol.md) for how
+   `common_mistakes` gets filled from a real second recording of common novice mistakes.
+8. **Real-time coaching runtime** ([learning_runtime/](learning_runtime/)) — a separate module
+   (no `projectaria-tools`/VRS dependency) that watches a learner via a top-mounted RGB camera
+   (MediaPipe Hands + an object detector, no gaze/hand-tracking hardware on the learner side) and
+   gives audio + visual corrections against a `step_templates.json`. See its README for the module
+   map and the offline-video-first testing workflow.
+
 ## Setup
 
 ```bash
@@ -77,9 +95,11 @@ cloud service.
 ## Repo layout
 
 ```
-docs/capture_protocol.md   # how to record a session
-meta.example.json          # template for output/<session_id>/meta.json
-requirements.txt           # Python dependencies
-scripts/                   # pipeline stages (see "How it works" above)
-output/                    # git-ignored — session recordings and derived data live here
+docs/capture_protocol.md              # how to record a session
+docs/mistake_elicitation_protocol.md  # how to record a second "common novice mistakes" session
+meta.example.json                     # template for output/<session_id>/meta.json
+requirements.txt                      # Python dependencies (offline pipeline)
+scripts/                              # pipeline stages (see "How it works" above)
+learning_runtime/                     # real-time coaching runtime (see its own README)
+output/                               # git-ignored — session recordings and derived data live here
 ```

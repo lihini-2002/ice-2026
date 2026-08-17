@@ -24,3 +24,12 @@ venv/
 # Local env overrides
 .env
 .env.*
+
+# webapp/frontend
+webapp/frontend/node_modules/
+webapp/frontend/dist/
+# Model files (hand landmarker .task, object detector weights) are supplied
+# locally per webapp/README.md — not committed, same rationale as the
+# offline pipeline's model caches above.
+webapp/frontend/public/models/
+webapp/frontend/public/mediapipe/

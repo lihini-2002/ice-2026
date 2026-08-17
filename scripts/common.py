@@ -47,6 +47,10 @@ class SessionPaths:
         return self.derived_dir / "frames"
 
     @property
+    def audio_start_time_json(self) -> Path:
+        return self.derived_dir / "audio_start_time.json"
+
+    @property
     def transcript_json(self) -> Path:
         return self.derived_dir / "transcript.json"
 
@@ -65,6 +69,10 @@ class SessionPaths:
     @property
     def session_md(self) -> Path:
         return self.root / "session.md"
+
+    @property
+    def step_templates_json(self) -> Path:
+        return self.root / "step_templates.json"
 
     def vrs_file(self) -> Path:
         candidates = sorted(self.raw_dir.glob("*.vrs"))
@@ -95,6 +103,13 @@ class Step:
     hand_actions: list[str] = field(default_factory=list)
     gaze_targets: list[str] = field(default_factory=list)
     frame_refs: list[str] = field(default_factory=list)
+    # Fraction of in-step frames/samples each label was observed in (0-1),
+    # ranked highest-first — the numeric counterpart to the human-readable
+    # tools_used/hand_actions/gaze_targets strings above. Consumed by
+    # generate_step_templates.py to threshold "required" tools/hand state.
+    tool_frequencies: dict[str, float] = field(default_factory=dict)
+    gaze_target_frequencies: dict[str, float] = field(default_factory=dict)
+    hand_target_frequencies: dict[str, dict[str, float]] = field(default_factory=dict)  # side -> label -> frequency
 
 
 @dataclass

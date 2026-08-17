@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 from projectaria_tools.core import data_provider
 
-from common import SessionPaths
+from common import SessionPaths, write_json
 
 RGB_CAMERA_LABEL = "camera-rgb"
 AUDIO_LABEL = "mic"
@@ -25,7 +25,15 @@ AUDIO_LABEL = "mic"
 FRAME_SAMPLE_INTERVAL_S = 2.0
 
 
-def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> None:
+def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> float:
+    """Returns the audio track's absolute start time in seconds (DEVICE_TIME,
+    same clock as extract_frames' frame_*.jpg timestamps — see
+    audio_start_time.json / transcribe.py). The written .wav file itself has
+    no timestamp metadata (WAV playback always starts at sample 0), so this
+    offset is the only way downstream stages can align a transcript segment
+    from Whisper (which is relative to the .wav file's start) with frames,
+    detected objects, and gaze/hand samples (which are all timestamped on
+    the recording's absolute device clock)."""
     stream_id = provider.get_stream_id_from_label(AUDIO_LABEL)
     if stream_id is None:
         raise RuntimeError("No audio stream found in this VRS — narration transcription needs the mic stream.")
@@ -38,8 +46,11 @@ def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> N
 
     num_data = provider.get_num_data(stream_id)
     frames = []
+    audio_start_s: float | None = None
     for i in range(num_data):
-        audio_data, _record = provider.get_audio_data_by_index(stream_id, i)
+        audio_data, record = provider.get_audio_data_by_index(stream_id, i)
+        if audio_start_s is None and record.capture_timestamps_ns:
+            audio_start_s = record.capture_timestamps_ns[0] / 1e9
         # Aria mic samples come back as plain Python ints wider than 16 bits
         # (observed as 24-bit audio left-shifted into a 32-bit word) — int32
         # is the safe container; forcing int16 here overflows.
@@ -53,9 +64,15 @@ def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> N
     # samples are (frame, channel). Downmix to mono for transcription.
     interleaved = interleaved[: len(interleaved) - (len(interleaved) % num_channels)]
     mono32 = interleaved.reshape(-1, num_channels).mean(axis=1) if num_channels > 1 else interleaved.astype(np.float64)
-    # Downscale from the ~24-bit range actually used down to int16 for a
-    # standard PCM16 wav (what faster-whisper/ffmpeg expect by default).
-    pcm = np.clip(mono32 / 256.0, -32768, 32767).astype(np.int16)
+    # Peak-normalize into int16 range rather than assuming a fixed raw bit
+    # depth: observed raw magnitude varies a lot by device/firmware/codec
+    # (e.g. Gen 1's ~24-bit-in-32-bit-word samples vs. Gen 2's decoded-Opus
+    # samples, which come back two-plus orders of magnitude smaller) — a
+    # fixed divisor tuned for one silently crushes the other to near-silence.
+    TARGET_PEAK = 30000.0  # headroom below int16's 32767 max
+    peak = np.abs(mono32).max()
+    scale = TARGET_PEAK / peak if peak > 0 else 1.0
+    pcm = np.clip(mono32 * scale, -32768, 32767).astype(np.int16)
 
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out_wav), "wb") as wf:
@@ -64,6 +81,7 @@ def extract_audio(provider: "data_provider.VrsDataProvider", out_wav: Path) -> N
         wf.setframerate(sample_rate)
         wf.writeframes(pcm.tobytes())
     print(f"Wrote audio: {out_wav} ({len(pcm) / sample_rate:.1f}s @ {sample_rate}Hz, downmixed from {num_channels}ch)")
+    return audio_start_s if audio_start_s is not None else 0.0
 
 
 def extract_frames(provider: "data_provider.VrsDataProvider", frames_dir: Path) -> None:
@@ -103,7 +121,8 @@ def main() -> None:
     if provider is None:
         raise RuntimeError(f"Failed to open VRS file: {vrs_path}")
 
-    extract_audio(provider, paths.derived_dir / "audio.wav")
+    audio_start_s = extract_audio(provider, paths.derived_dir / "audio.wav")
+    write_json(paths.audio_start_time_json, {"audio_start_s": audio_start_s})
     extract_frames(provider, paths.frames_dir)
 
 

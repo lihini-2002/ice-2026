@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Craft Coach</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+      }
+      #session-list {
+        list-style: none;
+        padding: 0;
+      }
+      #session-list li {
+        margin-bottom: 0.5rem;
+      }
+      #camera-wrap {
+        position: relative;
+        width: 640px;
+        max-width: 100%;
+      }
+      #camera {
+        display: block;
+        width: 100%;
+      }
+      #overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="session-select">
+      <h1>Pick a craft to learn</h1>
+      <ul id="session-list"></ul>
+    </section>
+
+    <section id="coaching" hidden>
+      <div id="camera-wrap">
+        <video id="camera" width="640" height="480" autoplay playsinline muted></video>
+        <canvas id="overlay" width="640" height="480"></canvas>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

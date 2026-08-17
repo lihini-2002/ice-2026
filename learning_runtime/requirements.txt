@@ -1,0 +1,13 @@
+# learning_runtime has no dependency on the offline pipeline's
+# requirements.txt (no projectaria-tools, no VRS handling). These are only
+# needed to actually run perception against a camera or video file —
+# step_tracker.py / comparator.py / command_generator.py are pure-Python and
+# unit-testable without any of this installed (see tests/).
+
+# MediaPipe Hands (learner-side hand tracking)
+mediapipe>=0.10.0
+
+# Video I/O for run_offline_test.py, and the array format perception.py's
+# ObjectDetector interface expects frames in
+opencv-python>=4.8.0
+numpy>=1.24.0

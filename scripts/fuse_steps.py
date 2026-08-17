@@ -57,18 +57,30 @@ def attach_objects(steps: list[Step], objects: list[dict]) -> None:
             if not (step.start_s <= frame["timestamp_s"] <= step.end_s):
                 continue
             frames_in_step.append(frame["frame"])
-            for obj in frame["objects"]:
-                if obj["label"] in IGNORED_OBJECT_LABELS or obj["score"] < OBJECT_SCORE_MIN:
-                    continue
-                counts[obj["label"]] += 1
+            # Count per-frame presence (a set), not raw detections — a tool
+            # detected twice in one frame shouldn't outweigh a frame it's
+            # only detected in once, and this keeps frequency <= 1.0.
+            labels_in_frame = {
+                obj["label"]
+                for obj in frame["objects"]
+                if obj["label"] not in IGNORED_OBJECT_LABELS and obj["score"] >= OBJECT_SCORE_MIN
+            }
+            counts.update(labels_in_frame)
         step.tools_used = [label for label, _ in counts.most_common()]
         step.frame_refs = frames_in_step[:2]  # a couple of representative frames
+        step.tool_frequencies = _frequency_map(counts, len(frames_in_step))
 
 
 def _ranked_targets(counts: Counter[str], total: int, top_n: int = 2) -> list[str]:
     if total == 0:
         return []
     return [f"{label} ({100 * n // total}%)" for label, n in counts.most_common(top_n)]
+
+
+def _frequency_map(counts: Counter[str], total: int) -> dict[str, float]:
+    if total == 0:
+        return {}
+    return {label: round(n / total, 3) for label, n in counts.most_common()}
 
 
 def attach_gaze_and_hand_targets(steps: list[Step], samples: list[dict]) -> None:
@@ -86,8 +98,10 @@ def attach_gaze_and_hand_targets(steps: list[Step], samples: list[dict]) -> None
         step.gaze_targets = _ranked_targets(gaze_counts, gaze_total) or (
             ["no eye-gaze data in this step"] if gaze_total == 0 else ["gaze not on a detected object"]
         )
+        step.gaze_target_frequencies = _frequency_map(gaze_counts, gaze_total)
 
         actions = []
+        hand_target_frequencies: dict[str, dict[str, float]] = {}
         for side in ("left", "right"):
             key = f"{side}_hand_target"
             side_counts: Counter[str] = Counter(s[key] for s in in_step if s.get(key))
@@ -99,7 +113,9 @@ def attach_gaze_and_hand_targets(steps: list[Step], samples: list[dict]) -> None
                 actions.append(f"{side} hand on {ranked[0]}")
             else:
                 actions.append(f"{side} hand tracked, not on a detected object ({side_total} samples)")
+            hand_target_frequencies[side] = _frequency_map(side_counts, side_total)
         step.hand_actions = actions or ["no hand-tracking data in this step"]
+        step.hand_target_frequencies = hand_target_frequencies
 
 
 def render_markdown(session: Session) -> str:

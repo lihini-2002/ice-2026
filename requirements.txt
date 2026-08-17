@@ -1,4 +1,8 @@
-# Core Aria data reading (VRS + MPS eye gaze / hand tracking parsing)
+# Core Aria data reading (VRS + MPS eye gaze / hand tracking parsing).
+# >=2.2.0 is required for Aria Gen 2 device-model/calibration support
+# (Gen 2 support landed in 2.0.0) — if `pip install` only resolves versions
+# up to ~1.3.x, your index is serving a stale/incomplete list; retry with
+# `pip install --index-url https://pypi.org/simple -r requirements.txt`.
 projectaria-tools>=2.2.0
 
 # Narration transcription (local, no audio leaves the machine)

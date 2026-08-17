@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import SessionPaths, TranscriptSegment, write_json
+from common import SessionPaths, TranscriptSegment, load_json, write_json
 
 # "base"/"small" are fast enough for a pilot on CPU; bump to "medium"/"large-v3"
 # once accuracy on craft-specific vocabulary (tool names) needs improving.
@@ -29,6 +29,21 @@ def main() -> None:
     if not audio_path.exists():
         raise FileNotFoundError(f"{audio_path} not found — run ingest_vrs.py first.")
 
+    # audio.wav itself has no timestamp metadata (playback always starts at
+    # sample 0), but frames/objects/gaze/hand samples are all timestamped on
+    # the recording's absolute device clock (see ingest_vrs.py). Without this
+    # offset, fuse_steps.py would compare transcript segments against frame
+    # timestamps on two different clocks and silently match nothing.
+    if paths.audio_start_time_json.exists():
+        audio_start_s = load_json(paths.audio_start_time_json)["audio_start_s"]
+    else:
+        audio_start_s = 0.0
+        print(
+            f"Warning: {paths.audio_start_time_json} not found — assuming a 0s offset. "
+            "Transcript timestamps may not line up with frame/object timestamps; "
+            "re-run ingest_vrs.py to regenerate it."
+        )
+
     from faster_whisper import WhisperModel
 
     print(f"Loading whisper model '{args.model_size}' ...")
@@ -38,7 +53,7 @@ def main() -> None:
     segments, info = model.transcribe(str(audio_path), vad_filter=True)
 
     out_segments = [
-        TranscriptSegment(start_s=seg.start, end_s=seg.end, text=seg.text.strip())
+        TranscriptSegment(start_s=seg.start + audio_start_s, end_s=seg.end + audio_start_s, text=seg.text.strip())
         for seg in segments
     ]
 
