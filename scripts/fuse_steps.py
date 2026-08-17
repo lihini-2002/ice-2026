@@ -1,9 +1,15 @@
 """Stage 5: fuse transcript + detected objects + gaze/hand targets into the
 per-step knowledge-base entries, and write session.json / session.md.
 
-Step boundaries come from the narration cue phrases artisans are asked to
-use (see docs/capture_protocol.md): a transcript segment starting with
-"next, i" / "now i'm going to" (etc.) starts a new step.
+Step boundaries are found one of two ways, selected via --segmenter:
+  - "llm" (default): sends the transcript text to the Claude API and asks it
+    to partition segments into logical steps (llm_segment.py). Handles
+    sessions where the artisan forgot the verbal cue. This is the one point
+    in the pipeline where data leaves the machine.
+  - "regex": the original mechanism — a transcript segment starting with
+    "next, i" / "now i'm going to" (etc., see docs/capture_protocol.md)
+    starts a new step. Fully local; used as an offline/no-API-key fallback,
+    and automatically as a fallback if the LLM call fails.
 
 Hand-object and gaze-object association ("gripping the rib tool", "looking
 at the clay") comes from extract_gaze_hand_targets.py's per-sample
@@ -12,7 +18,7 @@ just aggregates those samples per step into a ranked, human-readable
 summary.
 
 Usage:
-    python scripts/fuse_steps.py output/<session_id>
+    python scripts/fuse_steps.py <session_id> [--segmenter llm|regex] [--model MODEL]
 """
 
 from __future__ import annotations
@@ -23,6 +29,7 @@ from collections import Counter
 from pathlib import Path
 
 from common import SessionPaths, Session, Step, load_json, write_json
+from llm_segment import DEFAULT_MODEL, segment_into_steps_llm
 
 STEP_CUE_RE = re.compile(r"^\s*(next,?\s+i|now\s+i'?m\s+going\s+to|now\s+i\s+will)\b", re.IGNORECASE)
 IGNORED_OBJECT_LABELS = {"hand", "table", "workbench"}
@@ -125,21 +132,37 @@ def render_markdown(session: Session) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
+    parser.add_argument(
+        "--segmenter", choices=["llm", "regex"], default="llm",
+        help="step-boundary source: 'llm' (default, sends transcript text to the "
+             "Claude API) or 'regex' (fully local, requires the artisan's verbal cue)",
+    )
+    parser.add_argument(
+        "--model", default=DEFAULT_MODEL,
+        help=f"Claude model to use with --segmenter llm (default: {DEFAULT_MODEL})",
+    )
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
     meta = load_json(paths.meta)
     transcript = load_json(paths.transcript_json)
     objects = load_json(paths.objects_json) if paths.objects_json.exists() else []
     gaze_hand_samples = load_json(paths.gaze_hand_json) if paths.gaze_hand_json.exists() else []
 
-    steps = segment_into_steps(transcript)
+    if args.segmenter == "llm":
+        try:
+            steps = segment_into_steps_llm(transcript, model=args.model)
+        except Exception as e:
+            print(f"LLM segmentation failed ({e}) — falling back to regex cue matching.")
+            steps = segment_into_steps(transcript)
+    else:
+        steps = segment_into_steps(transcript)
     attach_objects(steps, objects)
     attach_gaze_and_hand_targets(steps, gaze_hand_samples)
 
     session = Session(
-        session_id=paths.root.name,
+        session_id=args.session_id,
         craft=meta["craft"],
         artisan_id=meta["artisan_id"],
         date=meta["date"],

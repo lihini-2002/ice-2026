@@ -1,11 +1,14 @@
 """Shared types and paths for the pilot pipeline.
 
-The pipeline works entirely off a session directory laid out as:
+The pipeline works off a session split across two top-level directories,
+keyed by the same session_id:
 
-    output/<session_id>/
+    videos/<session_id>/          # input — supplied before running the pipeline
         meta.json                 # artisan, craft, task, date — written by hand per docs/capture_protocol.md
         raw/<name>.vrs             # exported Aria recording
         mps/                       # MPS eye-gaze + hand-tracking outputs (from the MPS cloud request)
+
+    outputs/<session_id>/         # output — written by the pipeline stages
         derived/
             transcript.json        # written by transcribe.py
             objects.json           # written by extract_scene_objects.py
@@ -21,26 +24,47 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_VIDEOS_ROOT = REPO_ROOT / "videos"
+DEFAULT_OUTPUTS_ROOT = REPO_ROOT / "outputs"
+
 
 @dataclass
 class SessionPaths:
-    root: Path
+    session_id: str
+    videos_root: Path = DEFAULT_VIDEOS_ROOT
+    outputs_root: Path = DEFAULT_OUTPUTS_ROOT
+
+    @property
+    def input_dir(self) -> Path:
+        return self.videos_root / self.session_id
+
+    @property
+    def output_dir(self) -> Path:
+        return self.outputs_root / self.session_id
+
+    # Kept as `root` (rather than renaming every call site) since it's used
+    # as the base for frame paths stored relative in objects.json — those
+    # live under output_dir, so this stays output_dir.
+    @property
+    def root(self) -> Path:
+        return self.output_dir
 
     @property
     def meta(self) -> Path:
-        return self.root / "meta.json"
+        return self.input_dir / "meta.json"
 
     @property
     def raw_dir(self) -> Path:
-        return self.root / "raw"
+        return self.input_dir / "raw"
 
     @property
     def mps_dir(self) -> Path:
-        return self.root / "mps"
+        return self.input_dir / "mps"
 
     @property
     def derived_dir(self) -> Path:
-        return self.root / "derived"
+        return self.output_dir / "derived"
 
     @property
     def frames_dir(self) -> Path:
@@ -60,11 +84,11 @@ class SessionPaths:
 
     @property
     def session_json(self) -> Path:
-        return self.root / "session.json"
+        return self.output_dir / "session.json"
 
     @property
     def session_md(self) -> Path:
-        return self.root / "session.md"
+        return self.output_dir / "session.md"
 
     def vrs_file(self) -> Path:
         candidates = sorted(self.raw_dir.glob("*.vrs"))

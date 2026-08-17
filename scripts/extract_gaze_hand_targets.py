@@ -20,7 +20,7 @@ Geometry:
       that window — acceptable for the pilot's step-level aggregation.
 
 Usage:
-    python scripts/extract_gaze_hand_targets.py output/<session_id>
+    python scripts/extract_gaze_hand_targets.py <session_id>
 """
 
 from __future__ import annotations
@@ -77,10 +77,10 @@ def make_nearest_frame_lookup(objects: list[dict]):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
 
     if not paths.objects_json.exists():
         raise FileNotFoundError(f"{paths.objects_json} not found — run extract_scene_objects.py first.")

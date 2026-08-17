@@ -3,7 +3,7 @@
 Runs locally via faster-whisper — no audio leaves the machine.
 
 Usage:
-    python scripts/transcribe.py output/<session_id>
+    python scripts/transcribe.py <session_id>
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ WHISPER_MODEL_SIZE = "small"
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
     parser.add_argument("--model-size", default=WHISPER_MODEL_SIZE)
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
     audio_path = paths.derived_dir / "audio.wav"
     if not audio_path.exists():
         raise FileNotFoundError(f"{audio_path} not found — run ingest_vrs.py first.")

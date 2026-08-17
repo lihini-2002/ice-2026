@@ -6,7 +6,7 @@ tool/material vocabulary via meta.json (`known_tools`) as detection prompts,
 plus a small set of generic fallback prompts.
 
 Usage:
-    python scripts/extract_scene_objects.py output/<session_id>
+    python scripts/extract_scene_objects.py <session_id>
 """
 
 from __future__ import annotations
@@ -32,10 +32,10 @@ def frame_timestamp(path: Path) -> float:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("session_id")
     args = parser.parse_args()
 
-    paths = SessionPaths(args.session_dir)
+    paths = SessionPaths(args.session_id)
     if not paths.frames_dir.exists() or not any(paths.frames_dir.glob("*.jpg")):
         raise FileNotFoundError(f"No frames found in {paths.frames_dir} — run ingest_vrs.py first.")
 
