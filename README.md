@@ -24,9 +24,12 @@ known limitations.
 5. **Link gaze/hands** ([scripts/extract_gaze_hand_targets.py](scripts/extract_gaze_hand_targets.py))
    — projects Meta MPS eye-gaze and hand-tracking output into the RGB image plane and matches it
    against the detected object boxes, linking "looking at X" / "holding Y" to each moment.
-6. **Fuse** ([scripts/fuse_steps.py](scripts/fuse_steps.py)) — splits the transcript into steps
-   using the narration cue, attaches tools/gaze/hand data to each step, and writes
-   `session.json` (machine-readable) + `session.md` (human-readable).
+6. **Fuse** ([scripts/fuse_steps.py](scripts/fuse_steps.py)) — splits the transcript into steps,
+   attaches tools/gaze/hand data to each step, and writes `session.json` (machine-readable) +
+   `session.md` (human-readable). Step boundaries come from the Claude API by default
+   ([scripts/llm_segment.py](scripts/llm_segment.py) — needs `ANTHROPIC_API_KEY`; sends transcript
+   *text only*, no audio/video), which also covers sessions where the artisan forgot the verbal
+   cue. Pass `--segmenter regex` to use the original fully-local cue-phrase matcher instead.
 
 [scripts/run_pipeline.py](scripts/run_pipeline.py) chains all five stages.
 [scripts/common.py](scripts/common.py) holds the shared session layout and dataclasses.
